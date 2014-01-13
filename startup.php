@@ -10,21 +10,22 @@
  */
 namespace Azera;
 
-defined( 'DS' )		or define('DS'		, DIRECTORY_SEPARATOR);
-defined('Base')		or define('Base'	, __DIR__);
+defined( 'DS' )	or define('DS'		, DIRECTORY_SEPARATOR);
+defined('Base')	or define('Base'	, __DIR__);
 defined('APP')		or define('APP'		, Base . DS . 'App');
 defined('Azera')	or define('Azera'	, Base . DS . 'Azera');
 defined('CACHE')	or define('CACHE'	, APP . DS . 'tmp');
 
 require_once Azera . DS . 'AzeraLoader.php';
 
-use Azera\Core\StartupManager;
-use Azera\Routing\Dispatcher;
+use Azera;
+
 use Azera\IO\Request;
 use Azera\IO\Response;
 use Azera\Routing\Router;
+use Azera\Routing\Dispatcher;
+use Azera\Core\StartupManager;
 use Azera\Debug\Exceptions\Exception;
-use Azera;
 
 // Refuse direct script access
 if ( Request::uri() == '/startup.php' )
