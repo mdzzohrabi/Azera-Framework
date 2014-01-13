@@ -1,20 +1,20 @@
 <?php
 /**
- * 	Azera Framework v3.1
+ *	Azera Framework v3.1
  * 
- *  This is a PHP Framework to design easily and powerful
- *  applications based on PHP.
+ *	This is a PHP Framework to design easily and powerful
+ *	applications based on PHP.
  * 
  *	Development by @mdzzohrabi
- *	@author 	Masoud Zohrabi
+ *	@author		Masoud Zohrabi
  */
 namespace Azera;
 
-defined( 'DS' )     or define('DS'   ,DIRECTORY_SEPARATOR);
-defined('Base')	    or define('Base' , __DIR__);
-defined('APP')      or define('APP'  , Base . DS . 'App');
-defined('Azera')    or define('Azera', Base . DS . 'Azera');
-defined('CACHE') 	or define('CACHE'  , APP . DS . 'tmp');
+defined( 'DS' )		or define('DS'		, DIRECTORY_SEPARATOR);
+defined('Base')		or define('Base'	, __DIR__);
+defined('APP')		or define('APP'		, Base . DS . 'App');
+defined('Azera')	or define('Azera'	, Base . DS . 'Azera');
+defined('CACHE')	or define('CACHE'	, APP . DS . 'tmp');
 
 require_once Azera . DS . 'AzeraLoader.php';
 
@@ -26,31 +26,31 @@ use Azera\Routing\Router;
 use Azera\Debug\Exceptions\Exception;
 use Azera;
 
-/**
- * Refuse direct script access
- */
+// Refuse direct script access
 if ( Request::uri() == '/startup.php' )
+{
     Response::send( 'Direct access denied' );
+}
 
-/**
- * Load All Config Files
- */
+// Load All Config Files
 Azera::loadAll('Config');
 
-/** Load Routing Configurations **/
+// Load Routing Configurations from *\Config\Routing.php
 $routing = Azera::scanDirectories('Config',array(
 		'pattern'	=> 'Routing.php'
 	));
+
+// include routing files
 inc( $routing );
 
-/** Static routing controll **/
+// Static routing controll
 if ( $staticFile = Router::hasStatic( urldecode(Request::uri()) ) )
 {
 	Response::sendFile( $staticFile );
 	Response::send();
 }
 
-/** Forwarded Requests **/
+// Forwarded Requests
 if ( $file = Router::findForwardFile( Request::uri() ) )
 {
 	if ( file_exists($file) )
@@ -61,14 +61,10 @@ if ( $file = Router::findForwardFile( Request::uri() ) )
 	return;
 }
 
-/**
- * Load All Global Files
- */
+// Load All Global Files
 Azera::loadAll('Global');
 
-/**
- * Startup Manager manage startup functions
- */
+// Startup Manager manage startup functions
 $startupFiles 	= Azera::scanDirectories( 'Startup' , array(
 		'bundle'		=> '*',
 		'module'		=> '*'
@@ -80,9 +76,6 @@ $startup 	= new StartupManager( $startups );
 
 $startup->execute();
 
-/**
- * Dispatch client request
- */
+// Dispatch client request
 Dispatcher::execute( Dispatcher::dispatch() );
-
 ?>
