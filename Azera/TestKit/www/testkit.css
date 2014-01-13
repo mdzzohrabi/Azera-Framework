@@ -1,0 +1,19 @@
+table.testkit
+{
+	font-family: Tahoma;
+	font-size : 9pt;
+	border: 1px #ccc solid;
+}
+table.testkit thead th
+{
+	background: #f0f0f0;
+	padding: 10px 5px;
+}
+table.testkit tr td
+{
+	padding : 5px;
+}
+table.testkit tr.fail
+{
+	background: #CCAAAA;
+}

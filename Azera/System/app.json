@@ -1,0 +1,24 @@
+{
+
+	"app"	: "System",
+	"title"	: "System Core Bundle",
+	"version"	: "1.0",
+
+	"author"	:
+	{
+		"name"	: "Masoud Zohrabi",
+		"url"	: "http://mdz72.blogfa.com"
+	},
+
+	"controllers"	:
+	{
+		"Admin"	: 
+		{
+			"route"	:
+			{
+				"pattern"	: "/hello",
+				"area"		: "Home"
+			}
+		}
+	}
+}

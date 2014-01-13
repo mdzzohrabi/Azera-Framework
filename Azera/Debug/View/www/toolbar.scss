@@ -1,0 +1,123 @@
+@import '../../../View/CSS/SASS';
+body
+{
+	margin: 0;
+}
+.az-debug-toolbar
+{
+	@include linear-gradient( rgba(236, 236, 236, 1) ,#CACACA);
+	@include transition-duration(.2s);
+	cursor: default;
+	font: 100 8pt Tahoma;
+	width: 100%;
+	height: 45px;
+	position: fixed;
+	bottom: -45px;
+	border-top:1px #CFCFCF solid;
+	&::before
+	{
+		@extend %block;
+		@include data-svg('<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="64px" height="64px" viewBox="0 0 64 64" enable-background="new 0 0 64 64" xml:space="preserve"><g><polygon points="32.002,15.512 3.57,44.784 7.381,48.487 32.002,23.137 56.623,48.488 60.43,44.784 	"/></g></svg>');
+		background:
+		{
+			repeat: no-repeat;
+			size: 30px;
+			position: center center;
+		}
+		position: absolute;
+		width: 100%;
+		height: 40px;
+		top: -40px;
+		content: '';
+		@include transition-duration(.4s);
+	}
+	&:hover
+	{
+		bottom:0;
+		&::before
+		{
+			opacity: 0;
+		}
+	}
+	badge
+	{
+		@extend %inline-block;
+		@include border-radius(10px);
+		line-height: 25px;
+		width: 25px;
+		text-align:center;
+		background : #333;
+		color : #fff;
+		text-shadow: 0 1px 2px rgba(0,0,0,.7);
+	}
+	& > div
+	{
+		@extend %clearfix;
+		float: left;
+		border:
+		{
+			right: 1px #ccc solid;
+		}
+		padding: 0 10px 0 10px;
+		badge
+		{
+			float: left;
+			line-height: 20px;
+			width: 20px;
+			@include border-radius( 50px 50px 50px 0 );
+			margin: 
+			{
+				top: 13px;
+			}
+			background: #555;
+			@include transition-duration(.2s);
+		}
+		text
+		{
+			@extend %inline-block;
+			float:left;
+			line-height: 45px;
+			padding: 0 10px;
+			display: none;
+		}
+		icon
+		{
+			float:left;
+			background:
+			{
+				size: 40px;
+				position: center center;
+			}
+			opacity: .7;
+			height: 45px;
+			@include transition-duration(.2s);
+		}
+		&:hover
+		{
+			icon
+			{
+				opacity: 1;
+			}
+			badge
+			{
+				background: #111;
+			}
+		}
+	}
+	icon
+	{
+		@extend %inline-block;
+		width: 30px;
+		height: 30px;
+		background:
+		{
+			size: 30px;
+			position: 0 0;
+			repeat: no-repeat;
+		}
+		&[icon="staticFiles"]
+		{
+			@include data-svg('<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="100px" height="100px" viewBox="0 0 100 100" enable-background="new 0 0 100 100" xml:space="preserve"> <path d="M74.396,46.166l-0.028-0.103c-0.022-0.179-0.064-0.351-0.123-0.527l-0.06-0.177l-0.043-0.09 c-0.094-0.205-0.203-0.385-0.329-0.549l-0.031-0.063L54.208,25.085c-0.227-0.227-0.492-0.41-0.827-0.564l-0.234-0.086 c-0.172-0.059-0.349-0.101-0.533-0.126l-0.134-0.037h-13.04c-5.076,0-9.205,4.128-9.205,9.203v38.646 c0,5.075,4.129,9.203,9.205,9.203h25.765c5.072,0,9.2-4.128,9.2-9.203V46.427L74.396,46.166z M42.135,69.287H41.36 c-1.188,0-2.15-0.963-2.15-2.15c0-1.188,0.962-2.152,2.15-2.152h0.775c1.189,0,2.151,0.964,2.151,2.152 C44.287,68.324,43.325,69.287,42.135,69.287z M42.135,63.552H41.36c-1.188,0-2.15-0.964-2.15-2.15c0-1.188,0.962-2.151,2.15-2.151 h0.775c1.189,0,2.151,0.964,2.151,2.151C44.287,62.588,43.325,63.552,42.135,63.552z M42.135,57.816H41.36 c-1.188,0-2.15-0.963-2.15-2.15c0-1.188,0.962-2.151,2.15-2.151h0.775c1.189,0,2.151,0.964,2.151,2.151 C44.287,56.853,43.325,57.816,42.135,57.816z M63.824,69.287H48.051c-1.188,0-2.151-0.963-2.151-2.15 c0-1.188,0.963-2.152,2.151-2.152h15.772c1.189,0,2.15,0.964,2.15,2.152C65.974,68.324,65.013,69.287,63.824,69.287z M63.824,63.552 H48.051c-1.188,0-2.151-0.964-2.151-2.15c0-1.188,0.963-2.151,2.151-2.151h15.772c1.189,0,2.15,0.964,2.15,2.151 C65.974,62.588,65.013,63.552,63.824,63.552z M63.824,57.816H48.051c-1.188,0-2.151-0.963-2.151-2.15 c0-1.188,0.963-2.151,2.151-2.151h15.772c1.189,0,2.15,0.964,2.15,2.151C65.974,56.853,65.013,57.816,63.824,57.816z"/> </svg> ');
+		}
+	}
+}

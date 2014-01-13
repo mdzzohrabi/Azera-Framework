@@ -1,0 +1,64 @@
+/**
+	SASS (SCSS) Helper File
+**/
+%clearfix
+{
+	&::after,&::before
+	{
+		clear: both;
+		content: '';
+		display: block;
+	}
+}
+
+%block
+{
+	display: block;
+}
+
+%inline-block
+{
+	display: inline-block;
+}
+
+@mixin border-radius($radius...) {
+  -webkit-border-radius: $radius;
+     -moz-border-radius: $radius;
+      -ms-border-radius: $radius;
+       -o-border-radius: $radius;
+          border-radius: $radius;
+}
+
+@mixin transition-duration($time...)
+{
+	transition-duration: $time;
+	-moz-transition-duration: $time;
+	-o-transition-duration: $time;
+	-ms-transition-duration: $time;
+	-webkit-transition-duration: $time;
+}
+
+@mixin linear-gradient( $from , $to )
+{
+	background-color: $from;
+	background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, $from), color-stop(100%, $to));
+	background-image: -webkit-linear-gradient(top, $from, $to);
+	background-image: -moz-linear-gradient(top, $from, $to);
+	background-image: -ms-linear-gradient(top, $from, $to);
+	background-image: -o-linear-gradient(top, $from, $to);
+	background-image: linear-gradient(top, $from, $to);	
+}
+
+@mixin shadow($option...)
+{
+	box-shadow: $option;
+	-moz-box-shadow: $option;
+	-ms-box-shadow: $option;
+	-webkit-box-shadow: $option;
+	-o-box-shadow: $option;
+}
+
+@mixin data-svg( $svg )
+{
+	background-image: url("data:image/svg+xml;utf8," + $svg);
+}
