@@ -1,6 +1,4 @@
 <?php
-init('@Util.Set');
-
 use Azera\Util\Set;
 use Azera\Util\String;
 
@@ -9,20 +7,23 @@ class Azera
 
     /**
      * Create Alias from Classes
-     * @param mixed $alias      - Alias Name
-     * @param string $class     - Class name
+     * @param mixed     $alias     Alias Name
+     * @param String    $class     Class name
      */
     static function alias( $alias , $class = null )
     {
         if ( is_array($alias) )
         {
-            foreach ( $alias as $a => $b )
-                class_alias( $b , $a );
+            foreach ( $alias as $alias => $ref )
+                class_alias( $ref , $alias , true );
             return;
         }
         class_alias( $class , $alias );
     }
-    
+
+    /**
+     * return application packages folders 
+     */
     static function directories( $settings = array() )
     {
          $settings     = Set::extend(array(
@@ -34,24 +35,27 @@ class Azera
         
         $paths     = array();
 
-                            
-        if ( $module )
+        // Bundle\Module
+        if ( $module AND $bundle )
             $paths[]     = array(
                 'name'    => 'Module Scope',
                 'path'    => APP . DS . 'Bundle' . DS . $bundle . DS . $module
             );
-                
+              
+        // Bundle  
         if ( $bundle )
             $paths[]     = array(
                 'name'    => 'Bundle Scope',
                 'path'    => APP . DS . 'Bundle' . DS . $bundle
             );
-            
+        
         $paths     = Set::extend( $paths , array(
+            // App
             array(
                 'name'      => 'Application Global',
                 'path'      => APP
             ),
+            // System Folder
             array(
                 'name'      => 'System',
                 'path'      => System
@@ -63,6 +67,10 @@ class Azera
     
     /**
      * Scan For an pattern in a folder ( objectType )
+     * @param   string  $objectType     Pattern
+     * @param   array   $settings       Find Settings
+     * e.g  search for all Model(s)
+     * e.g  search for Model\User
      * @return array
      */
     static function scanDirectories( $objectType = null , $settings = array() )
@@ -71,12 +79,18 @@ class Azera
         
         /** Extend Settings **/
         $settings     = Set::extend(array(
-            'pattern'     => '*'
+            'pattern'     => '*',
+            'reverse'     => false
         ),$settings);
         
         extract($settings);
         
         $results     = array();
+
+        if ( $reverse )
+        {
+            $dirs   = array_reverse($dirs);
+        }
         
         foreach ( $dirs as $dir )
         {
@@ -89,9 +103,15 @@ class Azera
 
     /**
      * Scan for a target file
+     * 
+     * Azera::dispathFile( 'Azera.Acl.Model' )
+     * 
+     * @param   String  $path   Azera.Acl
+     * @return  String  File Path
      */
     static function dispatchFile( $path )
     {
+
         $route  = String::className( $path );
 
         /** Bundle Path **/
@@ -120,7 +140,17 @@ class Azera
 
     }
 
-    static function loadAll( $objectType , $settings = array( 'bundle' => '*' , 'module' => '*' ) )
+    /**
+     * Load All Resources
+     * 
+     * Azera::loadAll('Config',[ 'bundle'   => 'Azera' ])
+     * include Bundle\Azera\Config\*
+     * 
+     * @param String    $objecType  Object Type
+     * @param Array     $settings   Options
+     * @return void
+     */
+    static function loadAll( $objectType , $settings = [ 'bundle' => '*' , 'module' => '*' ] )
     {
         $files  = self::scanDirectories( $objectType , $settings );
         foreach ( $files as $file )

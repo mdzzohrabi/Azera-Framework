@@ -2,15 +2,30 @@
 namespace Azera\Routing;
 
 use Azera\Util\Set;
+use Azera\Util\String;
 
 class Router
 {
 
-	private static $routes 	= array();					// Application Routes
-	private static $static 	= array();					// Map From Public Url to Local Name
-	private static $forward = array();					// Forwarded Routes
-	private static $staticMaps 	= array(); 				// Map from Local Name to Public Name
-	private static $staticFolder 	= array();
+	private static $routes 			= [];					// Application Routes
+	private static $static 			= [];					// Map From Public Url to Local Name
+	private static $forward 		= [];					// Forwarded Routes
+	private static $staticMaps 		= []; 				// Map from Local Name to Public Name
+	private static $staticFolder 	= [];
+	private static $filters 		= [];
+
+	/**
+	 * Add Filter to routing dispatcher
+	 * @param 	string $filter
+	 */
+	function filter( $filterName , $callable = null )
+	{
+		
+		if ( is_null($callable) )
+			return self::$filters[$filterName];
+
+		self::$filters[$filterName] 	= $callable;
+	}
 
 	/**
 	 * Return Statics Files
@@ -22,17 +37,30 @@ class Router
 	}
 
 	/**
+	 * Return routing filters
+	 */
+	static function filters( $names = null )
+	{
+		if ( $names )
+		{
+			return array_intersect_key(self::$filters, $names);
+		}
+
+		return self::$filters;
+	}
+
+	/**
 	 * Optimize a URL
 	 * e.g 	home/ 	=> /home
 	 * @param 	string $url
 	 * @return 	string
 	 */
-	static function optimzeUrl( $url )
+	static function optimzeUri( $uri )
 	{
-		$url 	= trim( $url );
-		if ( substr( $url , 0 , 1 ) != '/' ) $url 	= '/' . $url;
-		if ( substr( $url , -1 , 1 ) == '/' ) $url 	= substr( $url , 0 , -1 );
-		return $url;
+		$uri 	= trim( $uri );
+		if ( substr( $uri , 0 , 1 ) != '/' ) $uri 	= '/' . $uri;
+		if ( substr( $uri , -1 , 1 ) == '/' ) $uri 	= substr( $uri , 0 , -1 );
+		return $uri;
 	}
 
 	/**
@@ -58,41 +86,44 @@ class Router
 
 	static function findForwardFile( $url )
 	{
-		$url 	= self::optimzeUrl( $url );
+		$url 	= self::optimzeUri( $url );
 		foreach (self::$forward as $prefix => $path)
 		{
-			$prefix 	= self::optimzeUrl( $prefix );
+			$prefix 	= self::optimzeUri( $prefix );
 			if ( substr( $url , 0 , strlen( $prefix ) ) == $prefix )
 				return $path . DS . substr( $url , strlen( $prefix ) + 1 );
 		}
 		return false;
 	}
 
-	static function routes( $area = null )
+	static function routes( $filters 	= array() )
 	{
 		$routes 	= array();
 		
-		if ( $area )
+		if ( !empty($filters) )
 		{
-			foreach ( self::$routes as $route )
-				if ( strtolower($route['area']) == strtolower($area) )
-					$routes[] 	= $route;
+			foreach ( self::$routes as $pattern => $route )
+			{
+				if ( $route->has( $filters ) )
+					$routes[ $pattern ] 	= $route;
+			}
 		}else
 		{
 			$routes 	= self::$routes;
 		}
 
 		uksort( $routes , function( $a , $b ){
-			return ( $a < $b );
+			return (string)$a > (string)$b;
 		});
+
 		return $routes;
 	}
 
 	/**
 	 * Add Static Files to Router
-	 * @param 	string 	$prefix
-	 * @param 	string 	$path
-	 * @param 	string 	$name
+	 * @param 	string 	$prefix 	Client url prefix
+	 * @param 	string 	$path 		Local Path
+	 * @param 	string 	$name 		Namespace scope name
 	 */
 	static function addStatic( $prefix , $path , $name = null )
 	{
@@ -117,7 +148,7 @@ class Router
 		{
 			foreach ( glob( $static['path'] ) as $file )
 			{
-				$fileName 	=	end( explode( DS , $file ) );
+				$fileName 	=	String::toListArray( $file , DS )->last();
 				$route 	=  '/' . $static['prefix'] . '/' . $fileName;
 				self::$static[ $route ] 	= $file;
 				self::$staticMaps[ $name . '/' . $fileName ] = $route;
@@ -125,23 +156,57 @@ class Router
 		}
 	}
 
+	static function localAsset( $mapKey )
+	{
+		return self::$static[ self::$staticMaps[ $mapKey ] ];
+	}
+
 	static function asset( $mapKey )
 	{
-		return self::$staticMaps[ $mapKey ];
+		if ( isset( self::$staticMaps[ $mapKey ] ) )
+			return BASE_URI . self::$staticMaps[ $mapKey ];
+
+		return BASE_URI . '/' . $mapKey;
+
 	}
 	
 	static function connect( $pattern , $settings = array() )
 	{
 
-		self::$routes[ $pattern ] 	= Set::extend( array(
-				'route'		=> null,				// ?
-				'action' 	=> null,				// Default Action
-				'args'		=> array(),				// Required Arguments
-				'passedArgs'=> array(),				// Default PassedArgs
-				'area'		=> null 				// Controller Route Area
-			) , $settings );
+		if ( !is_array($settings) )
+		{
+			$settings 	= [
+				'route'	=> $settings
+			];
+		}
+
+		// Add / to first of pattern
+		if ( substr( $pattern , 0 , 1 ) != '/' )
+		{
+			$pattern 	= '/' . $pattern;
+		}
+
+		return self::$routes[ $pattern ] 	= new Route( $settings + [ 'pattern' => $pattern ] );
 
 	}
 
+	static function define( $name , $regexp )
+	{
+		Route::define($name,$regexp);
+	}
+
+	/**
+	 * Return http based controller uri
+	 * @param 	String 	$route
+	 * @param 	Array 	$data
+	 * @param 	Boolean $fullURI
+	 * @return 	String
+	 */
+	static function url( $route, $data = [] , $fullURI = false )
+	{
+
+
+
+	}
 }
 ?>

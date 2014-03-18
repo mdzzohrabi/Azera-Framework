@@ -4,8 +4,20 @@ namespace Azera\IO;
 class Request
 {
 
+	public static $passedArgs 	= [];
+
+	static function passedArgs( $key )
+	{
+		return self::$passedArgs[ $key ];
+	}
+
 	# return client ip
 	static function remoteIP()
+	{
+		return server('REMOTE_ADDR');
+	}
+
+	static function IP()
 	{
 		return server('REMOTE_ADDR');
 	}
@@ -15,7 +27,7 @@ class Request
      */
     static function uri()
 	{
-		return server('REQUEST_URI');
+		return URI;
 	}
 
     /**
@@ -44,6 +56,11 @@ class Request
 	static function item( $item , $default = false )
 	{
 		return eval(eas( '_REQUEST' , $item , $default ));
+	}
+
+	static function method()
+	{
+		return server('REQUEST_METHOD');
 	}
 
 	static function all( $type = 'REQUEST' )

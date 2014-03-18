@@ -7,6 +7,7 @@ use Azera\Database\Model;
 use Azera\Cache\Cache;
 use Azera\Util\String;
 use Azera\Util\Set;
+use Azera\Debug\Exceptions;
 
 use mysqli;
 
@@ -27,6 +28,22 @@ class MySQLResult extends Result
 	{
 		return $this->result->fetch_assoc();
 	}
+
+	public function hasRow()
+	{
+		return $this->affected > 0;
+	}
+
+	public function fetchArray()
+	{
+		$result 	= [];
+		while ( $row = $this->read() )
+		{
+			$result[] 	= $row;
+		}
+		return $result;
+	}
+
 }
 
 class MySQL extends Engine
@@ -39,6 +56,8 @@ class MySQL extends Engine
 	public $startQuote 	= '`';
 	public $endQuote 	= '`';
 	public $encoding 	= 'utf8';
+
+	public $catchErrors = true;
 
 	public $columns = array(
 		'primary_key' 	=> array('name' => 'NOT NULL AUTO_INCREMENT'),
@@ -65,6 +84,21 @@ class MySQL extends Engine
 		$this->query( 'SET NAMES ' . $enc );
 	}
 
+	public function autoCommit( $value )
+	{
+		$this->connection->autocommit( $value );
+	}
+
+	public function commit()
+	{
+		return $this->connection->commit();
+	}
+
+	public function rollback()
+	{
+		$this->connection->rollback();
+	}
+
 	public function connect()
 	{
 		$config 	= $this->config();
@@ -80,7 +114,12 @@ class MySQL extends Engine
 		$time 	= microtime(true) - $time;
 
 		if ( $this->connection->error )
-			throw new \Exception( "Execute Query [{$sql}]" , 1);
+		{
+			if ( $this->catchErrors )
+				throw new Exceptions\Exception( $this->connection->error . " in [ $sql ]" );
+			else
+				return false;
+		}
 			
 
 		$this->affected 	= $this->result->count;
@@ -103,28 +142,42 @@ class MySQL extends Engine
 	public function getScheme( Model $model = null )
 	{
 
-		if ( !is_nulL( $model ) )
+		$engine 	= &$this;
+
+		$schemes 	= function() use ( $engine )
 		{
-			if ( !isset( $this->_schemes[ $model->fullTableName() ] ) ) return false;
+			$tables 	= $engine->query("SHOW TABLES FROM " . $engine->name( $engine->config['database'] ))->fetchArray();
+
+			$schemes 	= [];
+			
+			foreach ( $tables as $table )
+			{
+				$table 	= current( array_values( $table ) );
+
+				$schemes[$table] 	= $engine->query('SHOW FULL COLUMNS FROM ' . $engine->name($table) )->fetchArray();
+			}
+
+			return $schemes;
+
+		};
+
+		if ( !is_null( $model ) )
+		{
+			// Find Table in Cached
+			if ( !isset( $this->_schemes[ $model->fullTableName() ] ) )
+			{
+				if ( $this->query('SHOW TABLES LIKE ' . $model->value( $model->fullTableName() ) )->hasRow() )
+				{
+					$this->_schemes = $_schemes 	= Cache::from('models')->delete('dbo.sources')->get('dbo.sources', $schemes);
+
+					return $_schemes[ $model->fullTableName() ];
+				}
+				return false;
+			}
 			return $this->_schemes[ $model->fullTableName() ];
 		}
 
-		if ( !empty($this->_schemes) || $this->_schemes = Cache::read( 'dbo.sources' , 'models' ) )
-			return;
-
-		$this->query( 'SHOW TABLES FROM ' . $this->name( $this->config['database'] ) );
-		foreach ( $this->fetchArray() as $table )
-		{
-			$table 	= array_values($table);
-			$table 	= $table[0];
-
-			$this->query('SHOW FULL COLUMNS FROM ' . $this->name( $table ) );
-
-			$this->_schemes[ $table ] = $this->fetchArray();
-
-		}
-
-		Cache::write( 'dbo.sources' , $this->_schemes , 'models' );
+		return $this->_schemes = Cache::from('models')->get('dbo.sources',$schemes);
 
 	}
 
@@ -135,14 +188,23 @@ class MySQL extends Engine
 		return $this->result->read();
 	}
 
+	public function escape( $value )
+	{
+		return $this->connection->real_escape_string( $value );
+	}
+
 	public function datas( Model $model , $data = array() )
 	{
 		$datas 	= array();
+
+		// Remove undefined fields from datas
 		$data 	= array_intersect_key( $data , $model->scheme );
+
 		foreach ( $data as $field => $value )
 		{
-			$datas[] 	= $model->name( $field , 'field' , false ) . '="' . $value . '"';
+			$datas[] 	= $model->name( $field , 'field' , false ) . '=' . $model->value( $value ,$field);
 		}
+
 		return implode( ', ' , $datas );
 	}
 
@@ -216,6 +278,7 @@ class MySQL extends Engine
 		parent::renderStatement( $type , $options );
 		extract( $options );
 
+		if ( $type == 'select' )
 		foreach ( (array)$fields as $i => $field) {
 			if ( $field != '*' )
 				if ( is_string($i) )
@@ -232,6 +295,7 @@ class MySQL extends Engine
 				$where 	= $this->conditions( $model , $conditions , ' WHERE ' );
 				$sort 	= ( $sort ? ' ORDER BY ' . $model->name($sort) : '' );
 				$limit 	= ( $limit ? " LIMIT {$limit}" : '');
+				$joins 	= null;
 				return "SELECT {$fields} FROM {$table}{$joins}{$where}{$sort}{$limit}";
 				break;
 			case 'update':
@@ -243,6 +307,7 @@ class MySQL extends Engine
 			case 'insert':
 				$table 	= $model->name( $model , 'table' , false );
 				$data 	= $this->datas( $model , $data );
+				var_dump($data);
 				return "INSERT INTO {$table} SET {$data}";
 				break;
 			case 'delete':
@@ -290,7 +355,9 @@ class MySQL extends Engine
 
 	public function createTable( $table , $scheme , Model $model = null )
 	{
-		$prefix = $this->config['prefix'];
+		
+		$prefix = isset($this->config['prefix']) ? $this->config['prefix'] : null;
+
 		$sql 	= "CREATE TABLE IF NOT EXISTS `{$prefix}{$table}` (" . NL;
 		$fields = array();
 		$extra 	= array();

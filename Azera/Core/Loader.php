@@ -14,7 +14,7 @@ class Loader
 	 * @param bool 			$instance 	- Create Instance From Model
 	 * @return object | string
 	 */
-	function Model( $path , $instance = false )
+	static function Model( $path , $instance = true )
 	{
 		$path 	= (object)String::dispatch( $path , 'Model' );
 
@@ -22,7 +22,7 @@ class Loader
 
 		if ( !$file )
 		{
-			throw new Exceptions\ModelNotFound( $path );
+			throw new Exceptions\NotFound( sprintf('Model file not found `%s`', $path ) );
 		}
 
 		$modelNS 	= String::className( $path );
@@ -36,7 +36,7 @@ class Loader
 			return $modelNS;
 		}
 
-		throw new Exceptions\ModelClassNotFound( $path );
+		throw new Exceptions\ModelNotFound( $path );
 	}
 
 	/**
@@ -44,7 +44,7 @@ class Loader
 	 * @param string 	$path
 	 * @return object
 	 */
-	function Controller( $path , $instance = false , $owner = null )
+	static function Controller( $path , $instance = false , $owner = null )
 	{
 		$path 	= (object)String::dispatch( $path , 'Controller' );
 

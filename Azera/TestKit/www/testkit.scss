@@ -1,0 +1,27 @@
+table.testkit
+{
+	font-family: Tahoma;
+	font-size : 9pt;
+	border: 1px #ccc solid;
+	width: 100%;
+	thead th
+	{
+		background: #f0f0f0;
+		padding: 10px 5px;
+	}
+	tr
+	{
+		&.fail,&.fail td
+		{
+			background: #CCAAAA !important;
+		}
+		td
+		{
+			padding : 5px;
+		}
+		&:nth-child(even) td
+		{
+			background: #f6f6f6;
+		}
+	}
+}

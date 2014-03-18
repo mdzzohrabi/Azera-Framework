@@ -1,0 +1,1 @@
+<div class="flashMessage {$attr.class}">{$message}</div>

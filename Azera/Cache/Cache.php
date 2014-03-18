@@ -35,6 +35,9 @@ class Cache
 			return false;
 		}
 
+		if ( $value instanceof Closure )
+			$value 	= $value();
+
 		$fileName 	= $config['fileName']( $key );
 		$path 		= $config['path'] . DS . $fileName;
 		$data 		= $callback ? $callback($value) : is_callable($config['set']) ? $config['set']( $value ) : $value;
@@ -59,6 +62,13 @@ class Cache
 
 		return $data;
 
+	}
+
+	static function delete( $key , $config = 'default' )
+	{
+		$file 	= static::path( $key , $config );
+
+		unlink( $file );
 	}
 
 	static function exists( $key , $config = 'default' )
@@ -102,6 +112,16 @@ class Cache
 	}
 
 	static function inThe( $config = 'default' )
+	{
+		return new ConfigCache( $config );
+	}
+
+	static function to( $config = 'default' )
+	{
+		return new ConfigCache( $config );
+	}
+
+	static function from( $config )
 	{
 		return new ConfigCache( $config );
 	}

@@ -8,8 +8,8 @@
  **/
 namespace Azera\Database;
 
-init('@Database.Model.BehaviorCollection');
-init('@Database.Model.Behavior');
+//init('@Database.Model.BehaviorCollection');
+//init('@Database.Model.Behavior');
 
 use Azera\Core\Object;
 use Azera\Util\String;
@@ -53,9 +53,9 @@ class Model extends Object {
 	public $behavior 			= null;
 
 	public $regexCalls			= array(
-			'/find(.*)By(.*)/'		=> 'findBy',
-			'/delete(.*)By(.*)/'	=> 'deleteBy',
-			'/set(.*)Where(.*)/'	=> 'setWhere'
+			'/find(.*)By(.*)/'		=> '_findBy',
+			'/delete(.*)By(.*)/'	=> '_deleteBy',
+			'/set(.*)Where(.*)/'	=> '_setWhere'
 		);
 
 	public $findMethods 		= array(
@@ -115,8 +115,10 @@ class Model extends Object {
 		if ( $deep !== false )
 			$this->linkDeep = $deep;
 
-		$this->adapter 	= $this->adapter();
-		$this->alias 	= ( isset($this->alias) ? $this->alias : end(explode(NS, $this->toString() )) );
+		$name 			= String::toListArray( $this->toString() , NS )->last();
+
+		$this->adapter 	= &$this->adapter();
+		$this->alias 	= ( isset($this->alias) ? $this->alias : $name );
 		$this->userTable= $this->table;
 		$this->table 	= ( isset($this->table) ? $this->table : $this->determineTable() );
 		
@@ -129,6 +131,7 @@ class Model extends Object {
 		if ( $this->linkDeep >= 0 )
 			$this->loadRelations();
 
+		// Initialize Behaviors
 		$this->behavior 	= new BehaviorCollection( $this );
 
 		$this->behavior->init(  $this->actsAs );
@@ -136,12 +139,25 @@ class Model extends Object {
 		$this->startup();
 	}
 
+	private static $_object 	= null;
 	/**
 	 * Create a Custom iQuery
 	 */
 	public function go()
 	{
 		return new Model\iQuery( $this );
+	}
+
+	// Create Static alias for this model
+	public function asStatic( $name )
+	{
+		eval('
+			class ' . $name . ' extends Azera\Database\Model\StaticModel
+			{
+			}
+			');
+		$name::setModel($this);
+		return $this;
 	}
 
 	/**
@@ -174,8 +190,11 @@ class Model extends Object {
 	public function determineTable()
 	{
 		$names 	= array(
-				String::lower( $this->moduleName ) . '_' . String::plural( String::underscore($this->alias) ),
+				// module_aliases
+				String::lower( $this->module ) . '_' . String::plural( String::underscore($this->alias) ),
+				// alias
 				String::underscore($this->alias),
+				// aliases
 				String::plural(String::underscore($this->alias))
 			);
 
@@ -188,15 +207,24 @@ class Model extends Object {
 
 	/**
 	 * Load Model Assosiaction
+	 * @param 	String 		$model
+	 * @param 	Array 		$options 	Assocation options
+	 * @param 	RELATION 	$type 		Relation Type
+	 * @return 	void
 	 */
-	function loadAssociation( $model , $options = array() , $type = Model\RELATION::ONE )
+	function &loadAssociation( $model , $options = array() , $type = Model\RELATION::ONE )
 	{
 
+		// If it loaded past
 		if ( isset($this->relations[$model]) ) return;
+
+		// Convert Options to Array
 		$options	= (array)$options;
 
+		// Model Name
 		$_model = $model;
 
+		// Model Class Name
 		$class 	= $model;
 
 		if ( isset( $options['class'] ) )
@@ -208,15 +236,18 @@ class Model extends Object {
 		{
 			$route 	= String::dispatch( $model , 'model' );
 			$route 	= Set::extend(  $this->defaultRoute , array_filter($route)  );
-			$model 	= App\ClassRegistry::init( implode('.',$route) , 'Model' , $this->controller , $this ,  $this->linkDeep - 1 );
+			$class 	= String::className( $route );
+			$model 	= new $class( $this->controller , $this , $this->linkDeep - 1 );
+			//$model 	= App\ClassRegistry::init( implode('.',$route) , 'Model' , $this->controller , $this ,  $this->linkDeep - 1 );
 		}
 
 		if ( !$model )
 		{
-			throw new Exceptions\Exception( "Load model association failed $_model", 404);
+			throw new Exceptions\NotFound( "Load model association failed $_model" );
 			
 		}
 
+		// Default Options
 		$options 	= Set::extend(array(
 				'primaryKey'	=> a_b($model->alias) . '_id',
 				'linkType'		=> $type,
@@ -226,7 +257,10 @@ class Model extends Object {
 
 		$this->relations[ $_model ] = $options;
 
-		$this->{$model->alias}	= $model;
+		$this->{$model->alias}	 	= $model;
+
+		return $this->{$model->alias};
+
 	}
 
 	function fieldExists( $field )
@@ -255,9 +289,9 @@ class Model extends Object {
 
 	function fieldType( $field )
 	{
-		$column = $this->scheme[$field];
+		if ( !isset($this->scheme[$field]) ) return false;
 
-		if ( !$column ) return false;
+		$column = $this->scheme[$field];
 
 		preg_match( '/(.*)\((.*)\)/' , $column['Type'] , $out);
 
@@ -305,10 +339,17 @@ class Model extends Object {
 			. $this->adapter->endQuote;
 	}
 
-	function value( $value , $field )
+	function value( $value , $field = null )
 	{
 
+		if ( !$field )
+		{
+			return $this->adapter->startString . $value . $this->adapter->endString;
+		}
+
 		$type 	= $this->fieldType( $field );
+
+		$value 	= $this->adapter->escape($value);
 
 		if ( $type == 'integer' || $type == 'float' || $type == 'boolean' )
 			return $value;
@@ -316,9 +357,9 @@ class Model extends Object {
 		return $this->adapter->startString . $value . $this->adapter->endString;
 	}
 
-	function adapter()
+	function &adapter()
 	{
-		if ( $engine = Database::engine() )
+		if ( $engine = &Database::engine() )
 			return $engine;
 
 		throw new Exceptions\NotFound('Database Engine not set');
@@ -371,29 +412,47 @@ class Model extends Object {
 		return $this->scheme;
 	}
 
+	/**
+	 * SELECT Method
+	 * find('all');
+	 * find('first');
+	 * find('list');
+	 * find('count');
+	 * find('tree');
+	 */
 	public function find( $type = 'all' , $options  = array() )
 	{
 
+		// LIMIT 1 for first find type
 		if ( $type == 'first' ) $options['limit'] = 1;
 
-		$options 	= Set::extend(array(
-				'alias'	=> true
+		// Default Options
+		$options 	= array_merge(array(
+				'alias'		=> true,
+				'contain'	=> []
 			),$options);
 
+		// Add FindType to Options for Events
 		$options['findType']	= $type;
 
+		// Append Model default Sort
 		if ( !isset($options['sort']) && $this->sort )
 			$options['sort']	= $this->sort;
 
+		// Model beforeFind Event
 		$options 	= $this->beforeFind( $options );
 
+		// Other FindMethods in $this->findMethods
+		// can Add By addFindMethod( 'name', [] )
 		if ( isset( $this->findMethods[ $type ] ) )
 			return $this->{ $this->findMethods[ $type ] }( $options );
 
 		extract( $options );
 
-		$results 	= $this->adapter->find( $this , $options );
+		// fetch results
+		if ( !$results 	= $this->adapter->find( $this , $options ) ) return false;
 
+		// FindType 	: All
 		if ( $type == 'all' )
 		{
 			$result = array();
@@ -406,6 +465,7 @@ class Model extends Object {
 			return $this->afterFind($result,$options);
 		}
 
+		// FindType 	: List
 		if ( $type == 'list' )
 		{
 			$result 	= array();
@@ -416,11 +476,13 @@ class Model extends Object {
 			return $result;
 		}
 
+		// FindType 	: First
 		if ( $type == 'first' )
 		{
 			return $this->afterFind($this->_associations( $results->read() , $contain , $alias ),$options);
 		}
 
+		// FindType 	: Count
 		if ( $type == 'count' )
 		{
 			return $results->count;
@@ -428,6 +490,14 @@ class Model extends Object {
 
 	}
 
+
+	/**
+	 * Fetch Query Associations and append them to query result
+	 * @param 	Array 	$row 		Result Row
+	 * @param 	Array 	$contains 	Contains
+	 * @param 	Boolean $alias 		Row has Alias ?
+	 * @return 	Array 	Result
+	 */
 	private function _associations( $row , $contains = array() , $alias = true )
 	{
 		
@@ -471,25 +541,51 @@ class Model extends Object {
 		return $_result;
 	}
 
+	/**
+	 * Alias for find('all' , []);
+	 * @param 	Array 	$options
+	 * @return 	Result
+	 */
 	public function findAll( $options = array() )
 	{
 		return $this->find( 'all' , $options );
 	}
 
+	/**
+	 * alias for find('all',[]);
+	 */
+	public function all( $options = [] )
+	{
+		return $this->find( 'all' , $options );
+	}
+
+	/**
+	 * Alias for find('count', [])
+	 * @param 	Array 	$options
+	 */
 	public function count( $options = array() )
 	{
 		return $this->find( 'count' , $options );
 	}
 
+	/**
+	 * Alias for find('first' , []);
+	 * If not set conditions default set to id
+	 * @param Array $options
+	 */
 	public function read( $options = array() )
 	{
-		if ( empty( $options ) )
+		if ( empty( $options['conditions'] ) && $this->id )
 			$options['conditions'][ $this->pk ] = $this->id;
 
 		return $this->find( 'first' , $options );
 	}
 
-	/** Events **/
+	/**
+	 * beforeFind Events
+	 * @param  	Array	$options 	Find Options
+	 * @return 	Array 	Find Options
+	 */
 	protected function beforeFind( $options = array() )
 	{
 		
@@ -501,7 +597,8 @@ class Model extends Object {
 
 	protected function afterFind( $results = array() , $options = array() )
 	{
-		if ( $options['alias'] === false )
+
+		if ( isset($options['alias']) AND $options['alias'] === false )
 			return $results;
 
 		if ( !empty( $this->procedures ) )
@@ -524,7 +621,27 @@ class Model extends Object {
 		return 	Events::raiseEvent( $this->toString() . '::afterFind' , $results );
 	}
 
-	public function findBy( $in , $args )
+	public function trans( $trans , $rollbackIfFail = true )
+	{
+		$this->adapter->autoCommit(FALSE);
+		
+		$this->adapter->catchErrors 	= false;
+
+		$trans( $this );
+
+		!($state = $this->adapter->commit()) ? $this->adapter->rollback() : null;
+
+		$this->adapter->catchErrors 	= true;
+		
+		return $state;
+	}
+
+	public function rollback()
+	{
+		$this->adapter->rollback();
+	}
+
+	public function _findBy( $in , $args )
 	{
 		list( $fields , $conditions ) = $in;
 
@@ -538,16 +655,16 @@ class Model extends Object {
 			$fields 	= array('*');
 		}else{
 			$fields 	= String::underscore( $fields );
-			$fields 	= String::split( $fields , '_and_' );
+			$fields 	= explode( '_and_' , $fields );
 		}
 
 		$conditions	= String::underscore( $conditions );
-		$conditions = String::replace( $conditions , array(
+		$conditions = strtr( $conditions , array(
 				'_and_'	=> '|AND ',
 				'_or_'	=> '|OR '
 			) );
 
-		$conditions = String::split( $conditions , '|' );
+		$conditions = explode( '|' , $conditions );
 
 		if ( count($conditions) != count($args) )	return;
 
@@ -567,7 +684,7 @@ class Model extends Object {
 		return $this->adapter->delete( $this , $conditions );
 	}
 
-	public function deleteBy( $in , $args )
+	public function _deleteBy( $in , $args )
 	{
 		list( $fields , $conditions ) = $in;
 
@@ -595,7 +712,7 @@ class Model extends Object {
 
 	}
 
-	public function setWhere( $in , $args )
+	public function _setWhere( $in , $args )
 	{
 		list( $fields , $conditions ) = $in;
 
@@ -647,9 +764,8 @@ class Model extends Object {
 	{
 		foreach ( $this->regexCalls as $pattern => $proc )
 		{
-			preg_match( $pattern , $method , $out );
-	
-			if ( empty($out) ) continue;
+			
+			if ( !preg_match( $pattern , $method , $out ) ) continue;
 	
 			unset( $out[0] );
 			
@@ -664,60 +780,10 @@ class Model extends Object {
 
 namespace Azera\Database\Model;
 
-use Azera\Database\Model;
-
 class RELATION {
 	const MANY_MANY	= 'Many_Many';
 	const ONE 		= 'One';
 	const MANY 		= 'Many';
 	const BELONG 	= 'BelongsTo';
-}
-
-/**
- * Singeletion Query class
- * @param  App\Bundle\Model     $model  - Model object
- * @return query result
- * @author Masoud Zohrabi ( @mdzzohrabi )
- * */
-class iQuery
-{
-	private $model 		= null;
-	private $o 			= array();
-
-	function __construct( Model $model )
-	{
-		$this->model 	= $model;
-	}
-	function with()
-	{
-		$this->o['contain']		= func_get_args();
-		return $this;
-	}
-	function sort( $sort )
-	{
-		$this->o['sort'] 	= $sort;
-		return $this;
-	}
-	function where( $cond = array() )
-	{
-		$this->o['conditions']	= merge( (array)$this->o['conditions']  , (array)$cond );
-		return $this;
-	}
-	function find( $o = array() , $type = 'all' )
-	{
-		return $this->model->find( $type , Set::extend( $this->o , $o ) );
-	}
-	function count( $o = array() )
-	{
-		return $this->model->find( 'count' , Set::extend( $this->o , $o ) );
-	}
-	function one( $o = array() )
-	{
-		return $this->find( $o , 'first' );
-	}
-	function all( $o = array() )
-	{
-		return $this->find( $o );
-	}
 }
 ?>

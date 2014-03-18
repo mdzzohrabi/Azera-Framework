@@ -1,7 +1,14 @@
 <?php
 namespace Azera\Util;
 
+use Azera\View\View;
+
 class Session {
+
+	public static function start()
+	{
+		session_start();
+	}
 	
 	public static function read( $key )
 	{
@@ -13,9 +20,9 @@ class Session {
 		return eval('return $_SESSION["' . str_replace( '.' , '"]["' , $key ) . '"] = $value;');
 	}
 
-	public static function setFlash( $message = null , $element = 'flash-message' , $attrs = array() )
+	public static function setFlash( $message = null , $element = 'default' , $attrs = array() )
 	{
-		self::write('Sys.Flash',array(
+		self::write('App.Flash',array(
 				'message'	=> $message,
 				'element'	=> $element,
 				'attrs'		=> $attrs
@@ -24,9 +31,21 @@ class Session {
 
 	public static function getFlash()
 	{
-		$flash = self::read('Sys.Flash');
-		self::delete('Sys.Flash');
+		$flash = self::read('App.Flash');
+		self::delete('App.Flash');
 		return $flash;
+	}
+
+	public static function flash()
+	{
+
+		if ( $flash 	= self::getFlash() )
+		{
+			return View::make('Element.Message.' . $flash['element'])->set([ 'message'	=> $flash['message'] , 'attrs'	=> $flash['attrs'] ])->render();
+		}
+
+		return null;
+
 	}
 
 	public static function destroy()

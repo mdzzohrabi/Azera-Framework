@@ -1,6 +1,8 @@
 <?php
 namespace Azera\Util;
 
+use Azera\Util\ListArray;
+
 class String
 {
 
@@ -14,7 +16,14 @@ class String
         $input  = str_replace( '/' , '.' , $input );      // convert Module/Model to Module.Model
         $p      = explode( '.' , $input );
         $len    = count($p);
-        list( ${$var} , $module , $bundle )  = array_reverse( $p );
+
+        list( ${$var} , $module , $bundle )  = array_reverse( $p ) + array_fill(0, 3, null);
+
+        if ( empty($bundle) )
+        {
+        	$bundle 	= $module;
+        	$module 	= null;
+        }
 
         $route      = compact('bundle','module', $var );
 
@@ -23,8 +32,9 @@ class String
 
 	/**
 	 * Generate Namespace from dispatched or path
-	 * @param $path 		=> Azera.Acl.User 	or Array
-	 * @return string
+	 * @param 	mixed 	$path 	Azera.Acl.User 	or Array
+	 * @param 	string 	$type 	Object Type
+	 * @return 	string
 	 */
 	public static function className( $path , $type = 'Object' )
 	{
@@ -42,7 +52,7 @@ class String
 		if ( empty($bundle) && empty($module) )
 		{
 			return "App\\{$type}\\{$object}";
-		}elseif ( $module == 'System' )
+		}elseif ( $bundle == 'System' )
 		{
 			return "Azera\System\\{$type}\\{$object}";
 		}
@@ -688,6 +698,11 @@ class String
 	public static function split( $string , $by )
 	{
 		return explode( $by , $string );
+	}
+
+	public static function toListArray( $string , $seprator = null )
+	{
+		return new ListArray( explode( $seprator , $string ) );
 	}
 
 	public static function replace( $string , $find , $replace = '' )

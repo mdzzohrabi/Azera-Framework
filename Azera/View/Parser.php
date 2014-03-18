@@ -7,24 +7,44 @@ class Parser
 {
 
 	private static $regexp 	= array(
+			
 			# @for [:key = ]:value in (:list | start..end)  [step :step]
 			'/@for\s+(?:(?P<key>\w+)\s*=\s*)?(?P<value>\w+)\s+in\s+(?P<list>[a-zA-Z\."\'\d_()$]+)(?:\s*\|\s*(?P<func>[\w]+))?\s*(?:step\s+(?P<step>[\w$]+))*[ \t]*$/m'	=> 'compileFor',
+			
 			# @if exp
 			'/^([\s]*)@if\s+(.*)$/m'	=> 'compileIf',
+			
 			# @code
 			'/^([\s]*)@(.*)$/m'			=> 'compileCode',
+			
 			# { ($var,"String") [| $func] }
 			'/{\s*(\$(\w+)|\"([^\"]*)\")\s*[\|]?\s*([a-zA-Z:_]*)\s*}/'	=> 'compileVar',
+			
 			# comment
 			'/{{--((.|\s)*?)--}}/'		=> 'compileComments',
+			
 			# set variable
 			'/{{\s*set\s+(?P<var>\w+)\s*=\s*(?P<value>[\w\W]*?)\s*}}/m' 	=> 'compileVariableSet',
+			
 			# @Function arg,arg,...
 			//'/@(\w+)[ \t]*(.*)(?:;$|$|;)/m' => 'compileFunction',
+			
+			// Asset loader
 			'/asset:\/\/(?P<asset>[\w\/.]+)/m'		=> 'compileAsset',
+
+			// External saving scripts
 			'@<(?P<tag>\w+)(.*?)\s+external="true"(\s+fileName="(?P<fileName>(\w+))")?(.*?)>(?P<content>[\w\W\s]*?)</(\w+?)>@m' 	=> 'compileExternalLoad'
 		);
 
+	/**
+	 * Fetch scripts from content and save them on external file
+	 * supported tags :
+	 * 		- Script
+	 * 		- Link
+	 * Attributes :
+	 * 		- external 		true
+	 * 		- fileName 		(optional)
+	 */
 	public static function compileExternalLoad( $m )
 	{
 		switch ($m['tag']) {
@@ -74,7 +94,7 @@ class Parser
 		return $match[1] . "<?php if ( $exp ):?>";
 	}
 
-    protected function compileComments($value)
+    protected static function compileComments($value)
     {
     	$value 	= $value[1];
         return '<?php /*' . $value . '*/ ?>';
@@ -87,7 +107,7 @@ class Parser
 			if ( strpos( $list , '..' ) !== false )
 			{
 				list( $start , $end ) = explode('..' , $list);
-				$step 	= $step ? $step : 1;
+				$step 	= !empty($step) ? $step : 1;
 				$list 	= 'range('.$start.','.$end.','.$step.')';
 			}
 			elseif ( strpos( $list , '(' ) !== false )
@@ -99,7 +119,7 @@ class Parser
 				$list 	= '$' . $list;
 			}
 
-			if ( $func )
+			if ( !empty($func) )
 			{
 				$list 	= $func . '(' . $list . ')';
 			}
@@ -133,7 +153,7 @@ class Parser
 				'l'	=> 'strtolower'
 			);
 
-		$func 	= $funcAlias[ $func ] 	? $funcAlias[$func] : $func;
+		$func 	= isset($funcAlias[ $func ]) 	? $funcAlias[$func] : $func;
 
 		if ( !$func )
 		{
@@ -148,7 +168,7 @@ class Parser
 
 		foreach ( self::$regexp as $regexp => $compile )
 		{
-			$input 	= preg_replace_callback( $regexp , array(self,$compile), $input);
+			$input 	= preg_replace_callback( $regexp , array(__CLASS__,$compile), $input);
 		}
 
 		$replaces 	= 	array(

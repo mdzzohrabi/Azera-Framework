@@ -7,6 +7,8 @@ use Azera;
 use Azera\Debug\Exceptions;
 use Azera\Cache\Cache;
 use Azera\Util\Parser\Html as HtmlParser;
+use Azera\View\Parser\HAML;
+use Azera\Core\Process;
 
 /**
  *	Azera View Class
@@ -26,30 +28,74 @@ class View
 
 	public $file 	= null;
 
-	public $format 	= 'ctp';
+	public $format 	= 'view';
 
 	public $output 	= null;
 
 	public $tags 	= array();
+
+	private $obj 	= null;
+
+	private $filters 	= [];
+
+	public $__section 	= [];
+
+	public $blocks		= [];
+
+	private $__func 	= [
+
+		'define'		=> 'define'
+
+	];
+
+	private $layout 	= null;
 
 	/**
 	 *	View controller
 	 */
 	public $controller 	= null;
 
-	public function __construct( $controller = null , $view = null , $vars = array() )
+	public static function make( $view = null , $vars = [] , &$controller = null )
 	{
+		return new static( $controller , $view , $vars );
+	}
+
+	/**
+	 * View Package Constructor
+	 * 
+	 * 
+	 * 
+	 * @param 	object 		$controller 	View owner controller
+	 * @param 	string 		$view 			View name
+	 * @param 	array 		$vars 			View variables
+	 * 
+	 */
+	public function __construct( &$controller = null , $view = null , $vars = array() )
+	{
+
+		$this->__func 	+= [
+
+			'extend'	=> array($this , 'extend')
+		
+		];
 
 		$this->set( $vars );
 
 		$this->view 		= $view;
 
-		$this->controller 	= &$controller;
+		$this->controller 	= $controller;
 
-		$document 			= ( $this->controller->controllerType == Controller\Types::Area ? $this->controller : $this->controller->document );
+		// Document
+		if ( $controller instanceof Controller\Controller )
+			$document 			= ( $this->controller->controllerType == Controller\Types::Area ? $this->controller : $this->controller->document );
+		else
+			$document		= Process::area();
 
-		$theme 				= $document->theme;
+		// Theme
+		$theme 				= $document ? $document->theme : null;
 
+		// Convert view to Full address view
+		// index 	to 	Azera.User.index
 		if ( strpos($this->view,'.') === false && $this->controller )
 			$this->view 	= implode('.', array_filter(array(
 					$this->controller->bundle,
@@ -57,18 +103,30 @@ class View
 					$this->view
 				)));
 
+		// File address
+		// Azera.Acl.index 	to Azera/Acl/index.ctp
 		$file	= str_replace( '.' , DS , $this->view ) . '.' . $this->format;
 
-		$scans 	= array(
-				Themes . DS . $theme . DS . $file,
-				$this->controller->appPath . DS . 'View' . DS . $file
-			);
+		// Searchable paths
+		$scans 	= array_filter([
+				
+					$theme 	? Themes . DS . $theme . DS . $file : null,
+					
+					$this->controller ? $this->controller->appPath . DS . VIEW . DS . $file : null,
 
+					APP . DS . VIEW . DS . $file,
+
+					System . DS . VIEW . DS . $file
+
+				]);
+
+		// Search for view
 		foreach ( $scans as $scan )
 		{
 			if ( file_exists( $scan ) )
 			{
 				$this->file 	= $scan;
+				break;
 			}
 		}
 
@@ -77,27 +135,8 @@ class View
 			throw new Exceptions\ViewNotFound( $this->controller , $this->view , $scans );
 		}
 
-		$this->addTag('for',function( $tag ){
+		//$this->obj 	= new Parser\View( $this , $this->file , $this->vars );
 
-			$tag->attrs = array_merge(array(
-					'start'	=> 0,
-					'end'	=> 0,
-					'step'	=> 1
-				),$tag->attrs);
-
-			$start 	= (int)$tag->attrs['start'];
-			$end 	= (int)$tag->attrs['end'];
-			$step 	= (int)$tag->attrs['step'];
-			$out 	= null;
-
-			for ( $i = $start ; $i <= $end ; $i += $step )
-			{
-				$out 	.= str_replace( '$i' , $i , $tag->innerHtml );
-			}
-			return $out;
-		});
-
-		return $this;
 	}
 
 	public function addTag( $tag , $function = null )
@@ -118,18 +157,39 @@ class View
 
 		extract( $this->vars );
 
+		if ( TRUE || Cache::inThe('view')->old( $this->file , $this->file ) ):
+
 		$fileContent 	= file_get_contents( $this->file );
 
-		$fileContent 	= Parser::parse( $fileContent , $this->vars );
+		/*
+		$HAML 			= new HAML();
+
+		$HAML->setContent( $fileContent );
+
+		$fileContent 	= $HAML->parse();
+		*/
+
+		$fileContent 	= (new Parser\View( $this , $fileContent ))->parse();
+
+		//$fileContent 	= Parser::parse( $fileContent , $this->vars );
 
 		Cache::inThe('view')->write( $this->file , $fileContent );
 
+		endif;
+
 		ob_start();
 			//include_once __DIR__ . DS . 'Functions.php';
-			include_once Cache::inThe('view')->path( $this->file );				
+			$this->blocks 	= include_once Cache::inThe('view')->path( $this->file );				
 		$this->output 	= ob_get_clean();
 
 		//$this->output = $parsed = HtmlParser::getInstance( $this->output )->addTag( $this->tags )->parse();
+		
+		// Layout
+		if ( $this->layout )
+		{
+			$Layout 	= new View( $this->controller , $this->layout , [ 'content' => $this->output ] );
+			return $Layout->render();
+		}
 
 		return $this->output;
 
@@ -137,6 +197,9 @@ class View
 	
 	/**
 	 *	Pass variable to view
+     *  @param  mixed   $key
+     *  @param  mixed   $value
+     *  @return self
 	 */
 	public function set( $key  , $value = null )
 	{
@@ -163,6 +226,33 @@ class View
     public function __set( $key , $value )
     {
     	return $this->controller->{$key} 	= $value;
+    }
+
+    public function call( $function , $line , $args )
+    {
+    	if ( !isset($this->__func[$function]) ) return null;
+    	
+    	$args 	= array_merge( [$line] , $args );
+
+    	return call_user_func_array( $this->__func[$function] , $args);
+    }
+
+    public function __toString()
+    {
+    	return $this->render();
+    }
+
+    function &without( $block )
+    {
+    	$this->filters[] 	= $block;
+    	return $this;
+    }
+
+    function extend( $line , $view )
+    {
+
+    	echo $line;
+
     }
 
 }

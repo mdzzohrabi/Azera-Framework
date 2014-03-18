@@ -15,8 +15,9 @@ class Apps
 	 * Add an App to System
 	 * e.g add( "Azera.Acl" , "Azera.Mail" , "Azera.Forms" );
 	 * e.g add( array("Azera.Acl","Azera.Users" , "Azera"	=> array( "Forms" ) ) );
+	 * @return 	Array 	list of defined apps
 	 */
-	function add()
+	static function add()
 	{
 
 		$args 	= func_get_args();
@@ -50,12 +51,18 @@ class Apps
 	 * List of active Applications
 	 * @return array
 	 */
-	function getAll()
+	static function getAll()
 	{
 		return self::$apps;
 	}
 
-	function app( $app , $array = false )
+	/**
+	 * Get app.json content as object or array
+	 * @param 	String 	$app 	App Name
+	 * @param 	Boolean	$array 	return as array if set as true
+	 * @return 	mixed
+	 */
+	static function app( $app , $array = false )
 	{
 		list( $bundle , $module ) 	= explode( '.' , $app );
 
@@ -68,7 +75,7 @@ class Apps
 
 	}
 
-	function appAll( $node = null )
+	static function appAll( $node = null )
 	{
 		$result 	= array();
 

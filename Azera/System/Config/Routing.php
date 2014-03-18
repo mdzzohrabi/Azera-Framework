@@ -1,23 +1,44 @@
 <?php
-use Azera\Routing\Router;
-use Azera\Core\Config;
+// Configuration
+Config::set('Routing',[
+		
+		'Default'	=> [
+			'Area'		=> 'Home',
+			'Filters'	=> [ 'method' ]
+		],
+
+		'CaseSensitive'	=> false
+
+	]);
+
+// Filter routes by method
+Route::filter('method',function( &$route ){
+
+	if ( $route->acceptMethods )
+	{
+		return in_array( Request::method() , $route->acceptMethods );
+	}
+
+	return true;
+
+});
 
 /** System Core Public Web Files **/
-Router::addStatic( 'system' , dirname(__DIR__) . DS . 'web' . DS . '*' );
+Route::addStatic( 'system' , dirname(__DIR__) . DS . 'web' . DS . '*' );
 
 /** TestKit Routing **/
-Router::addForward( 'test' , Base . DS . 'Tests' );
-Router::addStatic( 'testkit' , Azera . DS . 'TestKit' . DS . 'www' . DS . '*' );
+Route::addForward( 'test' , Base . DS . 'Tests' );
+Route::addStatic( 'testkit' , Azera . DS . 'TestKit' . DS . 'www' . DS . '*' , 'testkit' );
 
 /** Public Cached Directory **/
-Router::addStatic('cached' , CACHE . DS . 'public' . DS . '*' , 'cached');
+Route::addStatic('cached' , CACHE . DS . 'public' . DS . '*' , 'cached');
 
 /** Debug Routes **/
-if ( Config::get('Debug') == true )
+if ( Config::read('Debug') == true )
 {
-	Router::addStatic(
+	Route::addStatic(
 		'system/debug' ,
-		Azera . DS . 'Debug' . DS . 'View' . DS . 'www' . DS . '*',
+		Azera . DS . 'Debug' . DS . 'View' . DS . WWW . DS . '*',
 		'system.debug'
 	);
 }

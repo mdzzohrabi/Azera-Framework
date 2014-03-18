@@ -1,0 +1,16 @@
+#extend "Layout.base"
+#layout "Layout.base"
+
+{{--Title Block--}}
+
+@block title
+<title>GoodBye {{$name}}</title>
+@end
+
+@block panel
+<b>Welcome</b> {{$name}}
+@end
+
+<title>@block title Hello @content@end</title>
+
+@block title World@end

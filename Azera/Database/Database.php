@@ -14,7 +14,7 @@ class Database
 	 * Return current database engine
 	 * @return Azera\Database\Engine
 	 */
-	static function engine()
+	static function &engine()
 	{
 		return self::$engine;
 	}

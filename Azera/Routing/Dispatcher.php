@@ -1,12 +1,14 @@
 <?php
 namespace Azera\Routing;
 
+use Closure;
 use Azera\IO\Request;
 use Azera\IO\Response;
 use Azera\Util\String;
 use Azera\Core\AreaManager;
 use Azera\Routing\Router;
 use Azera\Core\Process;
+use Azera\Controller;
 
 // init('@Routing.Router');
 
@@ -15,7 +17,9 @@ use Azera\Core\Process;
 class Dispatcher
 {
 
-	static function optimizeUrl( $url )
+	const 	DELIMETER 	= '/';
+
+	static function optimizeUri( $url )
 	{
 		$url 	= trim( $url );
 		if ( substr( $url , 0 , 1 ) != '/' ) $url 	= '/' . $url;
@@ -23,12 +27,16 @@ class Dispatcher
 		return $url;
 	}
 	
-	static function dispatch( $url = null )
+	static function dispatch( $uri = null )
 	{
 
-		if ( is_null($url) ) $url 	= Request::uri();
+		if ( is_null($uri) ) $uri 	= Request::uri();
 
-		$url 	= self::optimizeUrl( $url );
+		// Get Filtered and Sorted Routes
+		$uri 		= self::optimizeUri( $uri );
+
+		// Get filters
+		$filters 	= Router::filters();
 
 		$passedArgs 	= array();
 		$bundle 		= null;
@@ -39,98 +47,121 @@ class Dispatcher
 		
 		//$lang 			= Locale::current('routePrefix');
 
-		/**
-		 * Find PassedArgs in Requested url
-		 */
-		preg_match_all('/'.'(\w+):([^\/]+)'.'/',$url,$passedArgs);
+		// Find PassedArgs in Requested url
+		preg_match_all('/(?P<key>[^\/]+):(?P<value>[^\/]+)/',$uri,$passedArgs);
 
 		if ( !empty( $passedArgs[0] ) )
 		{
 
 			foreach ( $passedArgs[0] as $a )
-				$url 	= str_replace( '/' . $a , null, $url );
+				$uri 	= str_replace( '/' . $a , null, $uri );
 
-			$passedArgs 	= array_combine( $passedArgs[1] , $passedArgs[2] );
+			$passedArgs 	= array_combine( $passedArgs['key'] , $passedArgs['value'] );
+
 		}else
 		{
 			$passedArgs 	= array();
 		}
 
-		$parts 	= explode( '/' , $url );
+		// Take apart url by / delimeter
+		$routeParts 	= explode( self::DELIMETER , $uri );
 
-		$area = AreaManager::findByPrefix( $parts[1] );
+		// Find url url by prefix
+		$area 	= AreaManager::findByPrefix( $uri );
 
+		// Remove area prefix from url
 		if ( $area )
-			$url 	=  self::optimizeUrl(str_replace( '/' . $area->routePrefix . '/' , '' , $url ));
+		{
+			$uri 	=  self::optimizeUri(str_replace( '/' . $area->routePrefix . '/' , null , $uri ));
+		}
 
 		$found 	= false;
 
-		foreach ( Router::routes( $area ? $area->name : null ) as $pattern => $route )
+		$routeFilter 	= [];
+
+		if ( $area )
+			$routeFilter 	+= [ 'area'	=> $area->name ];
+
+		foreach ( Router::routes( $routeFilter ) as $pattern => $route )
 		{
-			$route 	= (object)$route;
-
-			/** Extract ":var"  matches **/
-			preg_match_all('/:(\w+)/', $pattern , $vars );
-
-			foreach ( $vars[0] as $var )
+			if ( ($parsed	= $route->filter( $uri )) !== FALSE )
 			{
-				$pattern 	= str_replace( '/' . $var , null , $pattern);
-			}
-
-			$pattern 	.= '/';
-
-			$fix 		 = !(in_array( 'args', $vars[1]) || in_array( 'action',$vars[1]));
-
-			if ( ($fix && self::optimizeUrl($url) == self::optimizeUrl($pattern)) || (!$fix && substr( $url , 0 , strlen($pattern) ) == $pattern) )
-			{
-
 				$found 	= true;
-
-				$after 	= explode('/' , substr( self::optimizeUrl( substr( $url , strlen($pattern) ) ) , 1 ) );
-
-				if ( in_array( ':action' , $vars[0] ) )
-				{
-					$action 	= $after[0];
-					unset( $after[0] );
-				}else
-				{
-					$action 	= $route->action;
-				}
-
-				if ( in_array( ':args' , $vars[0] ) )
-					$args 	= array_merge( $route->args , $after );
-				else
-					$args 	= $route->args;
-
+				$route 	= (object)$route->route();
 				break;
 			}
 
 		}
 
-		$passedArgs 	= array_merge( (array)$route->passedArgs , (array)$passedArgs );
 
 		if ( !$found )
 		{
-			$route 		= null;
+			$route 		= false;
+		}
+		else
+		{
+			$passedArgs 	= array_merge( (array)$route->passedArgs , (array)$passedArgs );
 		}
 
 
-		return compact('url','route', 'action' ,'args' , 'passedArgs','area');
+		return compact('uri','route', 'parsed', 'passedArgs','area');
 
 	}
 
-	public static function execute( $path )
+	public static function execute( $path  , $return = false )
 	{
 
 		$dispatch 	= (object)$path;
 
-		$areaClass 	= $dispatch->area['class'];
+		Request::$passedArgs 	=$dispatch->passedArgs;
 
-		$area 	= new $areaClass( null , $dispatch );
+		if ( $dispatch->area ):
 
-		Process::area( $area );
+			$areaClass 	= $dispatch->area->class;
 
-		Response::write( $area->render() );
+			// Create instanceof area object
+			$area 		= new $areaClass( null , $dispatch );
+
+			$output 	= $area->render();
+
+		else:
+
+			$output 	= Dispatcher::loadRoute( $dispatch );
+
+		endif;
+
+		if ( $return )
+		{
+			return $output;
+		}
+
+		// send result to output buffer
+		Response::write( $output );
+
+	}
+
+	/**
+	 * Load and execute route
+	 * @param 	Object 	$dispatch 	Dispatched route
+	 * @param 	Object 	$owner 		Owner controller
+	 * @return 	String
+	 */
+
+	public static function loadRoute( $dispatch , $owner = false )
+	{
+
+		$iteral 	= [ Route::ACTION , Route::CONTROLLER , Route::LANG , Route::ARGS ];
+
+		$args 		= array_diff_key( $dispatch->parsed , array_flip($iteral) );
+
+		$result		= null;
+
+		if ( $dispatch->route->route instanceof Closure )
+		{
+			$result 	= call_user_func_array( $dispatch->route->route , $args);
+		}
+
+		return $result;
 
 	}
 

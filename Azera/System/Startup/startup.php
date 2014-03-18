@@ -31,10 +31,7 @@ class Startup extends BaseStartup
 		AreaManager::init();
 
 		// Fetch Apps From Database
-		$apps 	= Loader::Model('System.Apps' , true)->findAll();
-
-		// Add System Core Bundle
-		Apps::add('System');
+		$apps 	= Loader::Model('System.App' , true)->findAll();
 
 		foreach ($apps as $app)
 		{

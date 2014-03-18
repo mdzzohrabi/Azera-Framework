@@ -12,12 +12,18 @@ class BehaviorCollection extends Object
 	private $_items	= array();
 	private $maps 	= array();
 	
-	function __construct( Model $model )
+	function __construct( Model &$model )
 	{
 		parent::__construct();
 		$this->model 	= $model;
 	}
 
+	/**
+	 * dispatch and call a method
+	 * @param 	String 	$method
+	 * @param 	Array 	$args
+	 * @return 	mixed
+	 */
 	public function dispatchMethod( $method , $args = array() )
 	{
 		foreach ($this->maps as $object => $methods) {
@@ -26,12 +32,23 @@ class BehaviorCollection extends Object
 		}
 	}
 
-	public function map( $object )
+	/**
+	 * Create a map from and Behavior
+	 * @param 	Object 	$object
+	 * @return 	Object
+	 */
+	public function &map( &$object )
 	{
 		$this->maps[ (string)$object ] 	= $object->map();
 		return $object;
 	}
 
+	/**
+	 * Initialize Behaviors
+	 * @param 	String 	$name
+	 * @param 	Array 	$config
+	 * @return 	Array 	Collector of Behaviors
+	 */
 	public function init( $name , $config = array() )
 	{
 
@@ -48,8 +65,10 @@ class BehaviorCollection extends Object
 			return;
 		}
 
-		$config['model']	= $this->model;
+		$config['model']	= &$this->model;
 
+
+		// Is set in the past ?
 		if ( isset($this->_items[$name]) ) return $this->_items[$name];
 
 		if ( $behavior = ClassRegistry::register( array("lib.bundle.model.behaviors.{$name}" , "App.Bundle.Model.Behaviors.{$name}") , $config ) )

@@ -19,12 +19,16 @@ defined('CACHE')	or define('CACHE'	, APP . DS . 'tmp');
 require_once Azera . DS . 'AzeraLoader.php';
 
 use Azera;
+
 use Azera\IO\Request;
 use Azera\IO\Response;
 use Azera\Routing\Router;
 use Azera\Routing\Dispatcher;
 use Azera\Core\StartupManager;
+use Azera\Core\Apps;
 use Azera\Debug\Exceptions\Exception;
+use Azera\Debug\Debug;
+use Azera\Util\Session;
 
 // Refuse direct script access
 if ( Request::uri() == '/startup.php' )
@@ -33,7 +37,15 @@ if ( Request::uri() == '/startup.php' )
 }
 
 // Load All Config Files
-Azera::loadAll('Config');
+Azera::loadAll('Config',[ 'reverse' => true ]);
+
+// Error Handling and Development Enviroment initialize
+Session::start();
+
+Debug::init();
+
+// Add System Core Bundle
+Apps::add('System');
 
 // Load Routing Configurations from *\Config\Routing.php
 $routing = Azera::scanDirectories('Config',array(
@@ -69,9 +81,12 @@ $startupFiles 	= Azera::scanDirectories( 'Startup' , array(
 		'bundle'		=> '*',
 		'module'		=> '*'
 	) );
+
 $startups 	= array();
+
 foreach ( $startupFiles as $file )
-	$startups[] 	= inc( $file );
+	$startups[] 	= include_once $file;
+
 $startup 	= new StartupManager( $startups );
 
 $startup->execute();

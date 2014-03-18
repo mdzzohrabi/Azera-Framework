@@ -24,7 +24,11 @@ spl_autoload_register(function( $class ){
     // Application Root Folder
 	elseif ( substr( $file , 0 , 3 ) == 'App' )
 	{
-		$file 	= App . DS . substr( $file , 4 );
+		$file 	= APP . DS . substr( $file , 4 );
+	}else
+	{
+		// Bundle\Azera\...
+		$file 	= APP . DS . $file;
 	}
 
 	if ( file_exists( $file ) )

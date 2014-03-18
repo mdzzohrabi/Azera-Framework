@@ -26,6 +26,8 @@ class Response
 	{
 		if ( is_array($url) ) $url 	= url($url);
 
+		if ( is_null($url) ) 	$url 	= BASE_URI;
+
 		if ( !is_null($flashMessage) )
 			Session::setFlash( $flashMessage , 'default' , array( 'class' => $flashType ) );
 
@@ -50,7 +52,7 @@ class Response
 	static function writeFile( $file )
 	{
 		if ( !file_exists($file) )
-			throw new \Exception( __("file '%s' not found",$file) , 404);
+			throw new \Azera\Debug\Exception\NotFound( __("file '%s' not found",$file) , 404);
 		
 		$content 	= file_get_contents($file);
 
@@ -61,8 +63,10 @@ class Response
 	static function sendFile( $file )
 	{
 
-		$ext 	= end( explode('.',$file) );
-		$name 	= end( explode(DS,$file) );
+		$parts 	= explode( '.' , $file );
+		$ext 	= end( $parts );
+		$parts 	= explode( DS , $file );
+		$name 	= end( $parts );
 
 		$mimes 	= array(
 		// 	Format 		MimeType

@@ -95,7 +95,10 @@ function inc( $file , $error = true )
 	{
 		$out 	= array();
 		foreach ($file as $item)
-			$out[] 	= inc( $item , $error );
+			if ( $error )
+				$out[] 	= inc( $item , $error );
+			else
+				$out[] 	= include_once $file;
 		return $out;
 	}
 	else
@@ -120,27 +123,19 @@ function env( $var )
 /**
  *  getInstance from a class
  *  e.g     with('Azera.IO.Request')->uri();
+ * 	e.g 	with('@IO.Request')->IP();
  */
 function with( $namespace )
 {
-    
-    $namespace  = String::replace( $namespace , array(
+
+    $namespace  = strtr( $namespace , array(
         '.' => NS,
         '@' => 'Azera\\'
     ));
 
 	$args 		= array_slice(func_get_args(),1);
 
-	init( $namespace );
-
-	if ( class_exists( $namespace ) )
-	{
-		return new $namespace( $args );
-	}
-
-	throw new \Azera\Debug\Exceptions\NotFound( _t('Namespace class not found "%s"' , $namespace) );
-
-	return false;
+	return new $namespace( $args );
 
 }
 
@@ -207,6 +202,11 @@ function using( $class )
 
 function asset( $mapKey )
 {
-	return \Azera\Routing\Router::asset( $mapKey );
+	return Azera\Routing\Router::asset( $mapKey );
+}
+
+function document()
+{
+	return Process::area();
 }
 ?>

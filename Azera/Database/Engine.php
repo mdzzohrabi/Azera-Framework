@@ -74,7 +74,7 @@ abstract class Engine
 
 	function config()
 	{
-		return Config::get('Database');
+		return Config::read('Database');
 	}
 
 	function connected()

@@ -51,7 +51,7 @@ class Manager
 		foreach ( $files as $file )
 		{
 
-			inc( $file );
+			include_once $file;
 
 			$class 	= strtr( $file , array(
 					APP 	=> 'Bundle',

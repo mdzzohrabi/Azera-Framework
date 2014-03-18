@@ -7,13 +7,25 @@ use Azera\IO\Response;
 class TestKit
 {
 
+	use \Azera\Core\Basic\Object;
+
 	public  $version 	= '1.0';
 
 	private $tests 	= array();
 	
-	function eq( $a , $b )
+	private function eq( $a , $b )
 	{
 		return ( $a == $b );
+	}
+
+	private function gt( $a , $b )
+	{
+		return $a > $b;
+	}
+
+	private function lt( $a , $b )
+	{
+		return $b < $a;
 	}
 
 	function startup()
@@ -36,6 +48,7 @@ class TestKit
 				'memory'	=> memory_get_usage(),
 				'totalMemory'=> memory_get_usage(),
 				'result'	=> null,
+				'resultType'=> null,
 				'class'		=> 'pass'
 			);
 		if ( $result )
@@ -45,6 +58,21 @@ class TestKit
 	function logResult( $name , $result )
 	{
 		$this->tests[ $name ]['result'] 	= $result;
+		$this->tests[ $name ]['resultType'] 	= gettype($result);
+	}
+
+	function log( $result , $name = null , $des = null , $time = null )
+	{
+		$this->tests[$name] = [
+			'comment'		=> $des,
+			'commentArgs'	=> [],
+			'time'			=> 0,
+			'totalTime'		=> microtime(true),
+			'memory'		=> 0,
+			'result'		=> $result,
+			'resultType'	=> gettype($result),
+			'class'			=> 'pass'
+		];
 	}
 
 	function endLog( $name )
@@ -84,6 +112,16 @@ class TestKit
 
 			$time 		= microtime(true) - $time;
 
+			$class 	= 'pass';
+
+			if ( isset($comment->args['result']) )
+			{
+				if ( $comment->args['result'] != $result )
+					$class = 'fail';
+			}
+
+			$resultType = gettype($result);
+
 			if ( is_object($result) )
 				$result 	= (array)$result;
 
@@ -103,16 +141,9 @@ class TestKit
 
 			$memory 	= memory_get_usage() - $memory;
 
-			$class 	= 'pass';
-
-			if ( isset($comment->args['result']) )
-			{
-				if ( $comment->args['result'] != $result )
-					$class = 'fail';
-			}
-
 			$this->tests[ $name ] = array(
 					'result'		=> $result,
+					'resultType'	=> $resultType,
 					'comment'		=> $comment->comment,
 					'commentArgs'	=> $comment->args,
 					'memory'		=> $memory,
@@ -130,7 +161,7 @@ class TestKit
 
 	static function comment( $comment )
 	{
-		$temp 		= array_filter( array_map( 'trim' , explode( "\n" , str_replace( array('*','/') , '' , $comment ) ) ) );
+		$temp 		= array_filter( array_map( 'trim' , explode( "\n" , str_replace( array('/*','*/','*') , '' , $comment ) ) ) );
 		$comment 	= array();
 		$args 		= array();
 		foreach ( $temp as $line )
@@ -150,7 +181,7 @@ class TestKit
 
 	static function run( $class )
 	{
-		Response::write('<link rel="stylesheet" href="/testkit/testkit.css"/>');
+		Response::write('<link rel="stylesheet" href="' . asset('testkit/testkit.css') . '"/>');
 
 		$tests 	= new $class();
 		$tests 	= $tests->results();
@@ -160,6 +191,7 @@ class TestKit
 		Response::write('<thead><tr>
 			<th>Method</th>
 			<th>Comment</th>
+			<th>Args</th>
 			<th>Result</th>
 			<th>Result Type</th>
 			<th>Memory</th>
@@ -171,12 +203,23 @@ class TestKit
 
 		foreach ( $tests as $name => $test )
 		{
+
 			$test 	= (object)$test;
+
+			$args 	= array();
+
+			foreach ( $test->commentArgs as $arg => $value )
+			{
+				$args[] = $arg . ' = ' . $value;
+			}
+
+
 			Response::write('<tr class="' . $test->class . '">
 				<td><pre>' . $name . '()</pre></td>
 				<td>' . nl2br($test->comment) . '</td>
+				<td><pre>' . implode( BR , $args ) . '</pre></td>
 				<td>' . $test->result . '</td>
-				<td>' . gettype($test->result) . '</td>
+				<td>' . $test->resultType . '</td>
 				<td>' . $test->memory . ' bytes</td>
 				<td>' . $test->totalMemory . ' bytes</td>
 				<td>' . sprintf('%.4f',$test->time * 1000) . ' ns</td>

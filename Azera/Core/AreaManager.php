@@ -3,6 +3,7 @@ namespace Azera\Core;
 
 use Azera;
 use Azera\Util\Set;
+use Azera\Routing\Dispatcher;
 
 class AreaManager
 {
@@ -17,7 +18,7 @@ class AreaManager
 		$areasFile 	= Azera::scanDirectories('Area');
 
 		foreach ( $areasFile as $file )
-			inc($file);
+			include_once $file;
 
 	}
 
@@ -28,17 +29,21 @@ class AreaManager
 		return false;
 	}
 
-	public static function findByPrefix( $prefix )
+	public static function findByPrefix( $uri )
 	{
 		$default 	= null;
-		foreach ( self::$areas as $key => $value) {
-			if ( $value['routePrefix'] == $prefix )
-				return $value;
+		
+		foreach ( self::$areas as $key => $value)
+		{
+			if ( $value['routePrefix'] == substr( $uri , 0 , strlen($value['routePrefix']) ) )
+				return (object)$value;
 			if ( $value['routePrefix'] == '' )
 				$default = $value;
 		}
+
 		if ( $default )
-			return $default;
+			return (object)$default;
+
 		return null;
 	}
 
@@ -50,6 +55,9 @@ class AreaManager
 	public static function add( $area )
 	{
 		$area 		= (object)$area;
+
+		$area->routePrefix 	= Dispatcher::optimizeUri( $area->routePrefix );
+
 		self::$areas[ $area->name ] 	= Set::extend(array(
 				'name'			=> null,
 				'routePrefix'	=> null,
